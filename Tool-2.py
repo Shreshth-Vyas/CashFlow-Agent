@@ -32,7 +32,7 @@ if not st.session_state.logged_in:
         password = st.text_input("Password", type="password")
         submit_button = st.form_submit_button("Login")
         if submit_button:
-            if username == "admin" and password == "lucknow123":
+            if username ==st.secret["ADMIN_USERNAME"] and password ==st.secret["ADMIN_PASSWORD"]:
                 st.session_state.logged_in = True
                 st.rerun()
             else:
@@ -502,4 +502,5 @@ with tab3:
                 save_data(st.session_state.db)
                 st.session_state.temp_extracted = None
                 st.success(f"🔄 Successfully updated existing client: {target_id}")
+
                 st.rerun()
