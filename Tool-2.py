@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import google.generativeai as genai
@@ -132,7 +133,8 @@ with st.sidebar:
     st.write("Simulate the 9:00 AM daily alert.")
     
     today_date = date.today()
-    pending_only = st.session_state.db[st.session_state.db["Payment Status"] == "Pending"]
+    # pending_only = st.session_state.db[st.session_state.db["Payment Status"] == "Pending"]
+    pending_only = st.session_state.db[st.session_state.db["Payment Status"].astype(str).str.strip().str.lower() == "pending"]
     total_stuck = pd.to_numeric(pending_only["Amount Due (₹)"], errors='coerce').sum()
     
     test_gm_email = st.text_input("Send Alert To (Your Email):", placeholder="xyz@gmail.com")
@@ -145,7 +147,7 @@ with st.sidebar:
                 result = send_daily_alert(test_gm_email, len(pending_only), total_stuck)
                 if result == "Success":
                     st.success("✅ Email Sent! Check your inbox.")
-                    st.balloons()
+                    st.snow()
                 else:
                     st.error(f"❌ Failed to send: {result}")
     
@@ -166,7 +168,8 @@ tab1, tab2, tab3 = st.tabs(["📨 Daily Action Queue", "⚙️ Manage Database",
 with tab1:
     st.subheader("📋 Today's Action List")
     
-    pending_only = st.session_state.db[st.session_state.db["Payment Status"] == "Pending"]
+    # pending_only = st.session_state.db[st.session_state.db["Payment Status"] == "Pending"]
+    pending_only = st.session_state.db[st.session_state.db["Payment Status"].astype(str).str.strip().str.lower() == "pending"]
     total_pending = pd.to_numeric(pending_only["Amount Due (₹)"], errors='coerce').sum()
     
     m1, m2, m3 = st.columns(3)
@@ -202,7 +205,7 @@ with tab1:
             st.warning(f"🔔 You have {len(missing_msgs)} clients in today's queue.")
             
             if st.button("🚀 Auto-Generate All Messages", type="primary", use_container_width=True):
-                st.markdown("### 🤖 AI is working its magic...")
+                st.markdown("### 🤖 AI is processing...")
                 progress_bar = st.progress(0)
                 status_text = st.empty()
                 tip_box = st.empty() 
@@ -231,31 +234,41 @@ with tab1:
                     except:
                         overdue_days = 0
                         
-                    if overdue_days > 20 or client_data['Relationship Status'] in ['Difficult', 'Tense']:
-                        tone = "Strict"
+                    # --- SMARTER TONE LOGIC ---
+                    if client_data['Relationship Status'] in ['Friend', 'Close']:
+                        base_tone = "Friendly & Casual"
+                    elif overdue_days > 20 and client_data['Relationship Status'] not in ['VIP', 'Friend', 'Close']:
+                        base_tone = "Strict"
                     elif overdue_days < 7:
-                        tone = "Friendly"
+                        base_tone = "Friendly"
                     else:
-                        tone = "Firm"
+                        base_tone = "Firm"
                         
                     prompt = f"""
-                    Write a payment reminder for:
-                    - Name: {client_data['Client Name']}
-                    - Amount: ₹{client_data['Amount Due (₹)']}
-                    - Overdue: {overdue_days} days
-                    - Relationship: {client_data['Relationship Status']}
-                    - Context: {client_data['Previous Context']}
+                    You are the owner of a business. Write a WhatsApp payment reminder to your client.
                     
-                    Write EXACTLY in this language: {client_data['Preferred Language']}.
-                    If Overdue > 20 days, be strict. If < 7 days, be friendly.
-                    Output ONLY the message text.
+                    CLIENT DETAILS:
+                    - Client Name: {client_data['Client Name']}
+                    - Amount Due: ₹{client_data['Amount Due (₹)']}
+                    - Overdue by: {overdue_days} days
+                    - Relationship Type: {client_data['Relationship Status']}
+                    - Client's Last Message/Excuse: "{client_data['Previous Context']}"
+                    - Language: {client_data['Preferred Language']}
+
+                    CRITICAL AI INSTRUCTIONS:
+                    1. SENSITIVITY OVERRIDE: Read the "Client's Last Message/Excuse". If it mentions death, hospitalization, severe tragedy, or illness, you MUST completely IGNORE the "{base_tone}" tone. Write a highly empathetic, respectful, and supportive message. Offer condolences and gently mention the pending amount, stating there is no immediate rush.
+                    2. APOLOGY RULE: If the client apologized previously, be highly polite and understanding.
+                    3. CONTEXT CLARITY: The "Excuse" is what the CLIENT told you. For example, if it says "out of town", it means the CLIENT is out of town, not you.
+                    4. STANDARD BUSINESS: If it's a normal excuse (like "will pay tomorrow" or no context), strictly follow this tone: {base_tone}.
+                    5. INTERNAL NOTES SECRECY (CRITICAL): The "Client's Last Message/Excuse" might contain internal business notes like "always pays late", "defaulter", or "ignores calls". NEVER mention these bad habits directly to the client. Do NOT write phrases like "we know you pay late". Use this knowledge internally to make your tone slightly firmer, but the actual message must remain 100% professional and polite.
+                    6. SIGN OFF: Always end the message professionally without using bracketed placeholders. Do NOT write [Your Name] or [Business Name].
+                    Output ONLY the exact WhatsApp message text. No extra text.
                     """
                     try:
                         response = model.generate_content(prompt)
-                        st.session_state.queue_msgs[idx] = {"text": response.text, "tone": tone}
+                        st.session_state.queue_msgs[idx] = {"text": response.text, "tone": base_tone}
                     except Exception as e:
-                        st.session_state.queue_msgs[idx] = {"text": f"Error: {e}", "tone": "Error"}
-                    
+                        st.session_state.queue_msgs[idx] = {"text": f"Error: {e}", "tone": "Error"}    
                     time.sleep(3) 
                     progress_bar.progress((i + 1) / len(missing_msgs))
                     
@@ -267,7 +280,7 @@ with tab1:
             st.success("✨ All messages are drafted and ready to send!")
             
             # Headers including Client ID context
-            h1, h2, h3, h4, h5, h6, h7 = st.columns([1.5, 1.2, 0.8, 0.8, 1.2, 1.2, 1.5])
+            h1, h2, h3, h4, h5, h6, h7 = st.columns([1.5, 1.2, 1.2,1.2, 1.2, 1.2, 1.5])
             h1.markdown("**1. Client (ID)**")
             h2.markdown("**2. AI Tone**")
             h3.markdown("**3. Email**")
@@ -278,7 +291,7 @@ with tab1:
             st.divider()
             
             for idx, client_data in action_queue.iterrows():
-                c1, c2, c3, c4, c5, c6, c7 = st.columns([1.5, 1.2, 1.0, 1.2, 1.2, 1.2, 1.5])
+                c1, c2, c3, c4, c5, c6, c7 = st.columns([1.5, 1.2, 1.2, 1.2, 1.2, 1.2, 1.5])
                 client_id = client_data['Client_ID']
                 
                 try:
@@ -341,7 +354,7 @@ with tab1:
 #------------------------------------
 with tab2:
     st.subheader("⚙️ Master Database")
-    st.write("Ab aap safely yahan data edit, upload aur delete kar sakte hain.")
+    st.write("You can safely upload,edit and delete data by double clicking on it")
     
     edited_df = st.data_editor(st.session_state.db, num_rows="dynamic", use_container_width=True, key="editor")
     
@@ -422,7 +435,7 @@ with tab3:
                     "Due Date": "If no old debt date, strictly set to today: {date.today()}",
                     "Next Action Date": "If promise to pay in future calculate date. Else ''",
                     "Payment Status": "Strictly write 'Pending'",
-                    "Relationship Status": "Choose: Regular, VIP, Difficult, or Tense",
+                    "Relationship Status": "Choose: Regular, VIP, Difficult,Friend or Tense",
                     "Previous Context": "Write a 1-line summary EXACTLY in the raw text's language. NO English translation.",
                     "Preferred Language": "Choose: Hindi, English, or Hinglish"
                 }}
@@ -502,6 +515,5 @@ with tab3:
                 save_data(st.session_state.db)
                 st.session_state.temp_extracted = None
                 st.success(f"🔄 Successfully updated existing client: {target_id}")
-
                 st.rerun()
-
+                
