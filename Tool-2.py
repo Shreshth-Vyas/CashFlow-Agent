@@ -355,7 +355,23 @@ with tab1:
 with tab2:
     st.subheader("⚙️ Master Database")
     st.write("You can safely upload,edit and delete data by double clicking on it")
-    
+    # --- NEW HELP SECTION STARTS HERE ---
+    with st.expander("ℹ️ Click here for Help: Columns & Relationship Guide"):
+        st.markdown("""
+        ### 📊 Database Columns Explained:
+        * **Client_ID:** Unique code for each client (e.g., C-101). AI uses this to match data.
+        * **Payment Status:** Type exactly **`Pending`** to send this client to the AI Action Queue.
+        * **Previous Context:** Client ka aakhiri excuse ya note (e.g., "Out of town", "Someone died"). *Note: AI isko padh kar apna tone badal lega.*
+        
+        ### 🎭 Relationship Status Guide (Crucial for AI Tone):
+        AI tumhare select kiye gaye status ke hisaab se apna WhatsApp message draft karta hai:
+        1. **VIP:** Top clients. AI inke saath hamesha extra polite aur respectful rahega, chahe kitna bhi late ho.
+        2. **Regular:** Normal clients. Standard professional tone use hogi.
+        3. **Friend:** Jaan-pehchan wale ya dost. AI bilkul casual aur friendly tone mein baat karega.
+        4. **Difficult:** Jo log hamesha paise rok kar rakhte hain. AI thoda 'Firm' (sakht) tone use karega.
+        5. **Tense:** Jinse pichli baar jhagda ya behes hui thi. AI yahan highly diplomatic aur 'Strict' rahega taaki baat na bigde.
+        """)
+    # --- NEW HELP SECTION ENDS HERE ---
     edited_df = st.data_editor(st.session_state.db, num_rows="dynamic", use_container_width=True, key="editor")
     
     if st.button("💾 Save All Changes", type="primary"):
